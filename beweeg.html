@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Beweeg</title>
+
+<!-- iOS PWA -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Beweeg">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a1714">
+
+<!-- App icon — gegenereerd als inline SVG via data URI -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231a1714'/%3E%3Ctext x='90' y='115' font-family='Georgia,serif' font-size='80' font-weight='300' fill='%23f5f0e8' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:ital,wght@0,300;0,600;1,300&display=swap');
+
+  :root {
+    --bg: #f5f0e8;
+    --ink: #1a1714;
+    --muted: #7a7268;
+    --accent: #c85a2a;
+    --accent2: #3d6b4f;
+    --surface: #ede8df;
+    --border: #d4cdc2;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  #splash {
+    position: fixed;
+    inset: 0;
+    background: var(--ink);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    transition: opacity 0.4s ease;
+  }
+
+  #splash.hidden { opacity: 0; pointer-events: none; }
+
+  #splash h1 {
+    font-family: 'Fraunces', serif;
+    font-size: 3rem;
+    font-weight: 300;
+    color: #f5f0e8;
+    letter-spacing: -0.02em;
+  }
+
+  #splash p {
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.3);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-top: 0.5rem;
+  }
+
+  header {
+    padding: 2rem 1.5rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  header h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    font-size: 2rem;
+    letter-spacing: -0.02em;
+  }
+
+  header p {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 0.3rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /* PHASE TABS */
+  .phase-bar {
+    display: flex;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    gap: 0;
+  }
+
+  .phase-tab {
+    flex: 1;
+    padding: 0.65rem;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: center;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+  }
+
+  .phase-tab:first-child { border-radius: 4px 0 0 4px; }
+  .phase-tab:last-child { border-radius: 0 4px 4px 0; border-left: none; }
+  .phase-tab.active-p1 { background: var(--accent); color: white; border-color: var(--accent); }
+  .phase-tab.active-p2 { background: var(--accent2); color: white; border-color: var(--accent2); }
+  .phase-tab.locked { opacity: 0.4; cursor: default; }
+
+  /* PROGRESS */
+  .progress-section {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .progress-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .progress-track {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  .progress-fill.p2 { background: var(--accent2); }
+
+  .week-dots {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.8rem;
+    flex-wrap: wrap;
+  }
+
+  .dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.55rem;
+    color: var(--muted);
+  }
+
+  .dot.done { background: var(--accent); border-color: var(--accent); color: white; }
+  .dot.done-p2 { background: var(--accent2); border-color: var(--accent2); color: white; }
+
+  /* PANELS */
+  .panel { display: none; padding: 1rem 1.5rem; }
+  .panel.active { display: block; }
+
+  /* LOCKED OVERLAY */
+  .locked-panel {
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+
+  .locked-panel .lock-icon { font-size: 2rem; margin-bottom: 0.8rem; }
+
+  .locked-panel p {
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.6;
+    max-width: 280px;
+    margin: 0 auto;
+  }
+
+  .locked-panel .progress-mini {
+    margin: 1rem auto 0;
+    max-width: 200px;
+  }
+
+  .locked-panel .prog-track {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+  }
+
+  .locked-panel .prog-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  .locked-panel .prog-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 0.3rem;
+  }
+
+  /* ROUTINE CARDS */
+  .routine-group { margin-bottom: 1.5rem; }
+
+  .routine-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .routine-label .dot-label {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .routine-label .dot-label.green { background: var(--accent2); }
+
+  .card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 0.6rem;
+  }
+
+  .card-header {
+    padding: 0.9rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+  }
+
+  .card-header:hover { background: var(--surface); }
+
+  .card-title {
+    font-family: 'Fraunces', serif;
+    font-size: 1.05rem;
+    font-weight: 300;
+  }
+
+  .card-meta {
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.5;
+  }
+
+  .card-body {
+    border-top: 1px solid var(--border);
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease;
+  }
+
+  .card-body.open { max-height: 3000px; }
+
+  .exercise {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .exercise:last-of-type { border-bottom: none; }
+
+  .ex-row { display: flex; gap: 0.75rem; align-items: flex-start; }
+
+  .ex-num {
+    font-size: 0.6rem;
+    color: var(--muted);
+    min-width: 1.2rem;
+    padding-top: 0.15rem;
+  }
+
+  .ex-content { flex: 1; }
+
+  .ex-name { font-size: 0.85rem; font-weight: 500; margin-bottom: 0.2rem; }
+
+  .ex-desc { font-size: 0.72rem; color: var(--muted); line-height: 1.5; }
+
+  .ex-volume { font-size: 0.65rem; color: var(--accent); margin-top: 0.25rem; }
+  .ex-volume.green { color: var(--accent2); }
+
+  .yt-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.4rem;
+    font-size: 0.65rem;
+    color: #c00;
+    text-decoration: none;
+    opacity: 0.8;
+    transition: opacity 0.15s;
+  }
+
+  .yt-link:hover { opacity: 1; }
+
+  .yt-icon {
+    width: 14px; height: 14px;
+    background: #c00;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .yt-icon::after {
+    content: '';
+    border-left: 6px solid white;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    margin-left: 1px;
+  }
+
+  .start-btn {
+    margin: 0.8rem 1rem;
+    padding: 0.7rem 1rem;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    width: calc(100% - 2rem);
+    transition: opacity 0.15s;
+  }
+
+  .start-btn:hover { opacity: 0.85; }
+  .start-btn.green { background: var(--accent2); }
+
+  /* WEEK SCHEDULE (phase 2) */
+  .week-schedule {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .week-row {
+    display: flex;
+    align-items: center;
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--border);
+    gap: 0.75rem;
+  }
+
+  .week-row:last-child { border-bottom: none; }
+
+  .week-day {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    min-width: 2.5rem;
+  }
+
+  .week-content { flex: 1; }
+
+  .week-type {
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+
+  .week-sub {
+    font-size: 0.65rem;
+    color: var(--muted);
+    margin-top: 0.15rem;
+  }
+
+  .week-badge {
+    font-size: 0.6rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .week-badge.orange { border-color: var(--accent); color: var(--accent); }
+  .week-badge.green { border-color: var(--accent2); color: var(--accent2); }
+
+  /* ELBOW NOTE */
+  .elbow-note {
+    margin: 0 0 1.5rem;
+    padding: 0.8rem 1rem;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    font-size: 0.7rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  .elbow-note strong {
+    color: var(--ink);
+    font-weight: 500;
+    display: block;
+    margin-bottom: 0.3rem;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .unlock-notice {
+    background: var(--accent2);
+    color: white;
+    padding: 0.8rem 1rem;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    line-height: 1.5;
+    margin-bottom: 1rem;
+    display: none;
+  }
+
+  .unlock-notice.show { display: block; }
+
+  /* INFO BLOCK */
+  .info-block {
+    background: var(--surface);
+    border-left: 3px solid var(--accent2);
+    padding: 0.8rem 1rem;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+  }
+
+  .info-block strong { color: var(--ink); font-weight: 500; }
+
+  /* TIMER OVERLAY */
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--ink);
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+  }
+
+  .overlay.active { display: flex; }
+
+  .timer-phase {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 0.5rem;
+  }
+
+  .timer-exercise {
+    font-family: 'Fraunces', serif;
+    font-size: 1.8rem;
+    font-weight: 300;
+    color: white;
+    margin-bottom: 0.3rem;
+    line-height: 1.2;
+  }
+
+  .timer-volume { font-size: 0.75rem; color: rgba(255,255,255,0.5); margin-bottom: 0.4rem; }
+
+  .timer-desc {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.4);
+    max-width: 280px;
+    line-height: 1.6;
+    margin-bottom: 0.6rem;
+  }
+
+  .timer-yt {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.65rem;
+    color: rgba(255,80,80,0.85);
+    text-decoration: none;
+    margin-bottom: 1.5rem;
+  }
+
+  .timer-yt:hover { color: #ff6060; }
+
+  .timer-yt-icon {
+    width: 14px; height: 14px;
+    background: #c00;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .timer-yt-icon::after {
+    content: '';
+    border-left: 6px solid white;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    margin-left: 1px;
+  }
+
+  .timer-circle {
+    width: 130px; height: 130px;
+    position: relative;
+    margin-bottom: 1.8rem;
+  }
+
+  .timer-circle svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .timer-circle circle { fill: none; stroke-width: 3; }
+  .circle-bg { stroke: rgba(255,255,255,0.1); }
+  .circle-fill { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+
+  .timer-number {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Fraunces', serif;
+    font-size: 2.5rem; font-weight: 300;
+    color: white;
+  }
+
+  .timer-controls { display: flex; gap: 1rem; }
+
+  .t-btn {
+    padding: 0.7rem 1.5rem;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: transparent;
+    color: white;
+    border-radius: 5px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .t-btn:hover { background: rgba(255,255,255,0.1); }
+  .t-btn.primary { background: var(--accent); border-color: var(--accent); }
+  .t-btn.primary.green { background: var(--accent2); border-color: var(--accent2); }
+  .t-btn.primary:hover { opacity: 0.85; }
+
+  .timer-progress {
+    position: absolute;
+    bottom: 2rem; left: 0; right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 0.4rem;
+  }
+
+  .t-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+  .t-dot.done { background: var(--accent); }
+  .t-dot.done-p2 { background: var(--accent2); }
+  .t-dot.current { background: white; }
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <h1>Beweeg</h1>
+  <p>mobiliteit & kracht</p>
+</div>
+
+<header>
+  <h1>Beweeg</h1>
+  <p id="phase-subtitle">Fase 1 — mobiliteit & herstel</p>
+</header>
+
+<div class="phase-bar">
+  <div class="phase-tab active-p1" id="tab-p1" onclick="switchPhase(1)">Fase 1</div>
+  <div class="phase-tab locked" id="tab-p2" onclick="switchPhase(2)">Fase 2 🔒</div>
+</div>
+
+<div class="progress-section">
+  <div class="progress-label">
+    <span id="progress-label-text">Sessies fase 1</span>
+    <span id="session-count">0 / 24</span>
+  </div>
+  <div class="progress-track">
+    <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+  </div>
+  <div class="week-dots" id="week-dots"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     FASE 1
+═══════════════════════════════════════════ -->
+<div class="panel active" id="panel-p1">
+
+  <div class="unlock-notice" id="unlock-notice">
+    ✓ 24 sessies voltooid — Fase 2 is ontgrendeld. Kracht en looptraining komen er nu bovenop.
+  </div>
+
+  <!-- Ochtend -->
+  <div class="routine-group">
+    <div class="routine-label"><span class="dot-label"></span>Ochtend — 10 min</div>
+    <div class="card">
+      <div class="card-header" onclick="toggleCard('ochtend')">
+        <div class="card-title">Ochtendmobiliteit</div>
+        <div class="card-meta">6 oefeningen<br>~10 min</div>
+      </div>
+      <div class="card-body" id="body-ochtend">
+        <div class="exercise"><div class="ex-row"><div class="ex-num">01</div><div class="ex-content">
+          <div class="ex-name">Cat-Cow</div>
+          <div class="ex-desc">Viervoeters. Adem in → rug holt. Adem uit → rug rond. Tempo = ademhaling.</div>
+          <div class="ex-volume">10 herhalingen</div>
+          <a class="yt-link" href="https://www.youtube.com/watch?v=MgDn34q4Hm8" target="_blank"><span class="yt-icon"></span>Demonstratie</a>
+        </div></div></div>
+
+        <div class="exercise"><div class="ex-row"><div class="ex-num">02</div><div class="ex-content">
+          <div class="ex-name">90/90 Hip Rotation</div>
+          <div class="ex-desc">Zittend, beide knieën 90°. Bekken voor en achter kantelen. Houd eindpunt 2 sec.</div>
+          <div class="ex-volume">8× per kant</div>
+          <a class="yt-link" href="https://www.youtube.com/watch?v=f_7qIPxw6nE" target="_blank"><span class="yt-icon"></span>Demonstratie</a>
+        </div></div></div>
+
+        <div class="exercise"><div class="ex-row"><div class="ex-num">03</div><div class="ex-content">
+          <div class="ex-name">Chin Tuck</div>
+          <div class="ex-desc">Rechtop. Kin horizontaal naar achter schuiven. Geen neerwaartse rotatie. Houd 3 sec.</div>
+          <div class="ex-volume">10 herhalingen</div>
+          <a class="yt-link" href="https://www.youtube.com/watch?v=gIBoxQ6AlS0" target="_blank"><span class="yt-icon"></span>Demonstratie</a>
+        </div></div></div>
+
+        <div class="exercise"><div class="ex-row"><div class="ex-num">04</div><div class="ex-content">
+          <div class="ex-name">World's Greatest Stretch</div>
+          <div class="ex-desc">Uitvalspas, hand naast voet. Elleboog naar grond, dan arm omhoog draaien en met ogen volgen.</div>
+          <div class="ex-volume">5× per kant</div>
+          <a class="yt-link" href="https://www.youtube.com/watch?v=-CiWQ2IvY34" target="_blank"><span class="yt-icon"></span>Demonstratie (Squat University)</a>
+        </div></div></div>
+
+        <div class="exercise"><div class="ex-row"><div class="ex-num">05</div><div class="ex-content">
+          <div class="ex-name">Thread the Needle</div>
+          <div class="ex-desc">Viervoeters. Arm door de opening tot schouder en wang de grond raken.</div>
+          <div class="ex-volume">8× per kant</div>
+          <a class="yt-link" href="https://www.youtube.com/watch?v=oAQ_qycUj5o" target="_blank"><span class="yt-icon"></span>Demonstratie</a>
+        </div></div></div>
+
+        <div class="exercise"><div class="ex-row"><div class="ex-num">06</div><div class="ex-content">
+          <div class="ex-name">McKenzie Press-Up</div>
+          <div class="ex-desc">Op buik, handen onder schouders. Bovenlichaam omhoog duwen, bekken op grond laten.</div>
+          <div class="ex-volume">10 herhalingen</div>
+          <a class="yt-link" href="https://www.youtube.com/watch?v=tIZppe-RB0g" target="_blank"><span class="yt-icon"></span>Demonstratie</a>
+        </div></div></div>
+
+        <button class="start-btn" onclick="startSession('ochtend')">▶ Start begeleide sessie</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bureau -->
+  <div class="routine-group">
+    <div class="routine-label"><span class="dot-label"></span>Bureau — 5 min tussendoor</div>
+    <div class="card">
+      <div class="card-header" onclick="toggleCard('bureau')">
+        <div class="card-title">Bureaubreak</div>
+        <div class="card-meta">4 oefeningen<br>~5 min</div>
+      </div>
+      <div class="card-body" id="body-bureau">
+        <div class="exercise"><div class="ex-row"><div class="ex-num">01</div><div class="ex-content">
+          <div class="ex-name">Chin Tuck (zittend)</div>
+          <div class="ex-desc">Op stoel. Kin horizontaal terugtrekken. Houd 3 sec. Corrigeert forward head posture.</div>
+          <div class="ex-volume">10 herhalingen</div>
+          <a class="yt-link" href="https://www.youtube.com/watch?v=7rnlAVhAK-8" target="_blank"><span class="yt-icon"></span>Demonstratie</a>
+        </div></div></div>
+
+        <div class="exercise"><div class="ex-row"><div class="ex-num">02</div><div class="ex-content">
+          <div class="ex-name">Schouderblad knijpen</div>
+          <div class="ex-desc">Rechtop. Schouderbladen naar elkaar en omlaag. Houd 3 sec. Tegengif voor schermhouding.</div>
+          <div class="ex-volume">10× — 3 sec hold</div>
+        </div></div></div>
+
+        <div class="exercise"><div class="ex-row"><div class="ex-num">03</div><div class="ex-content">
+          <div class="ex-name">Seated Hip Flexor Stretch</div>
+          <div class="ex-desc">Vooraan op stoel. Één been achterwaarts, voet op grond. Bekken licht vooruit. Voel de rek vooraan in de heup.</div>
+          <div class="ex-volume">30 sec per kant</div>
+        </div></div></div>
+
+        <div class="exercise"><div class="ex-row"><div class="ex-num">04</div><div class="ex-content">
+          <div class="ex-name">Thoracale rotatie (zittend)</div>
+          <div class="ex-desc">Armen gekruist over borst. Draai rustig links en rechts vanuit de borstwervelkolom. Hoofd volgt mee.</div>
+          <div class="ex-volume">10× per kant</div>
+        </div></div></div>
+
+        <button class="start-btn" onclick="startSession('bureau')">▶ Start begeleide sessie</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Avond -->
+  <div class="routine-group">
+    <div class="routine-label"><span class="dot-label"></span>Avond — 12 min</div>
+    <div class="card">
+      <div class="card-header" onclick="toggleCard('avond')">
+        <div class="card-title">Avondactivatie</div>
+        <div class="card-meta">4 oefeningen<br>~12 min</div>
+      </div>
+      <div class="card-body" id="body-avond">
+        <div class="exercise"><div class="ex-row"><div class="ex-num">01</div><div class="ex-content">
+          <div class="ex-name">Dead Bug</div>
+          <div class="ex-desc">Ruglig, armen omhoog, heupen 90°. Strek tegenovergesteld arm en been. Lage rug blijft op de grond.</div>
+          <div class="ex-volume">3 × 6 per kant</div>
+          <a class="yt-link" href="https://www.youtube.com/watch?v=zechBkcIMf0" target="_blank"><span class="yt-icon"></span>Demonstratie</a>
+        </div></div></div>
+
+        <div class="exercise"><div class="ex-row"><div class="ex-num">02</div><div class="ex-content">
+          <div class="ex-name">Glute Bridge</div>
+          <div class="ex-desc">Ruglig, knieën gebogen. Bekken omhoog tot lijn knie–heup–schouder. 2 sec hold bovenaan.</div>
+          <div class="ex-volume">3 × 10</div>
+          <a class="yt-link" href="https://www.youtube.com/watch?v=xpc8Jz6zvak" target="_blank"><span class="yt-icon"></span>Demonstratie</a>
+        </div></div></div>
+
+        <div class="exercise"><div class="ex-row"><div class="ex-num">03</div><div class="ex-content">
+          <div class="ex-name">Bird Dog</div>
+          <div class="ex-desc">Viervoeters. Tegenovergesteld arm en been horizontaal strekken. 3 sec houden. Stabiliteit is het werk.</div>
+          <div class="ex-volume">3 × 6 per kant</div>
+          <a class="yt-link" href="https://www.youtube.com/watch?v=5Zp9IYxDYB4" target="_blank"><span class="yt-icon"></span>Demonstratie</a>
+        </div></div></div>
+
+        <div class="exercise"><div class="ex-row"><div class="ex-num">04</div><div class="ex-content">
+          <div class="ex-name">Wall Slide</div>
+          <div class="ex-desc">Rug tegen muur, armen W-positie. Schuif naar Y terwijl ellebogen en polsen de muur blijven raken.</div>
+          <div class="ex-volume">2 × 10</div>
+          <a class="yt-link" href="https://www.youtube.com/watch?v=Sws_GwrlYO0" target="_blank"><span class="yt-icon"></span>Demonstratie</a>
+        </div></div></div>
+
+        <button class="start-btn" onclick="startSession('avond')">▶ Start begeleide sessie</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Elleboog -->
+  <div class="elbow-note">
+    <strong>Elleboogprotocol — tenniselleboog rechts</strong>
+    Dagelijks, 2 minuten. Los van de andere sessies.<br><br>
+    <strong style="text-transform:none;font-size:0.7rem;display:inline;">Excentrische polsextensie:</strong> Onderarm op tafel, handpalm naar beneden. Met de andere hand de vuist omhoog helpen, dan traag (3–4 sec) laten zakken. 3 × 10. Lichte vermoeidheid ok, pijn niet.
+  </div>
+
+</div><!-- end panel-p1 -->
+
+
+<!-- ═══════════════════════════════════════════
+     FASE 2
+═══════════════════════════════════════════ -->
+<div class="panel" id="panel-p2">
+
+  <!-- LOCKED STATE -->
+  <div class="locked-panel" id="p2-locked">
+    <div class="lock-icon">🔒</div>
+    <p>Fase 2 ontgrendelt na <strong>24 sessies</strong> in Fase 1. Voltooi eerst de mobiliteitsgewoontes voordat kracht en duur erbovenop komen.</p>
+    <div class="progress-mini">
+      <div class="prog-track"><div class="prog-fill" id="p2-locked-fill" style="width:0%"></div></div>
+      <div class="prog-label" id="p2-locked-label">0 / 24 sessies</div>
+    </div>
+  </div>
+
+  <!-- UNLOCKED CONTENT (hidden until 24 sessions) -->
+  <div id="p2-content" style="display:none">
+
+    <div class="unlock-notice show" style="margin-bottom:1rem;">
+      ✓ Fase 1 voltooid — mobiliteit en herstel zitten in je routine. Nu bouw je kracht en uithouding op.
+    </div>
+
+    <!-- Weekoverzicht -->
+    <div class="routine-group">
+      <div class="routine-label"><span class="dot-label green"></span>Weekstructuur</div>
+      <div class="week-schedule">
+        <div class="week-row">
+          <div class="week-day">Ma</div>
+          <div class="week-content">
+            <div class="week-type">Mobiliteit (Fase 1 ochtend)</div>
+            <div class="week-sub">Behoud — 10 min</div>
+          </div>
+          <div class="week-badge orange">Fase 1</div>
+        </div>
+        <div class="week-row">
+          <div class="week-day">Di</div>
+          <div class="week-content">
+            <div class="week-type">Kracht A</div>
+            <div class="week-sub">Kettlebell / boulderen / bootcamp</div>
+          </div>
+          <div class="week-badge green">Kracht</div>
+        </div>
+        <div class="week-row">
+          <div class="week-day">Wo</div>
+          <div class="week-content">
+            <div class="week-type">Looptraining</div>
+            <div class="week-sub">Opbouw naar trailrun 16 km</div>
+          </div>
+          <div class="week-badge green">Duur</div>
+        </div>
+        <div class="week-row">
+          <div class="week-day">Do</div>
+          <div class="week-content">
+            <div class="week-type">Mobiliteit (Fase 1 avond)</div>
+            <div class="week-sub">Herstel + activatie — 12 min</div>
+          </div>
+          <div class="week-badge orange">Fase 1</div>
+        </div>
+        <div class="week-row">
+          <div class="week-day">Za</div>
+          <div class="week-content">
+            <div class="week-type">Kracht B</div>
+            <div class="week-sub">Kettlebell thuis of calisthenics</div>
+          </div>
+          <div class="week-badge green">Kracht</div>
+        </div>
+        <div class="week-row">
+          <div class="week-day">Vr/Zo</div>
+          <div class="week-content">
+            <div class="week-type">Rust of actief herstel</div>
+            <div class="week-sub">Wandeling, niets verplicht</div>
+          </div>
+          <div class="week-badge">Herstel</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kracht A -->
+    <div class="routine-group">
+      <div class="routine-label"><span class="dot-label green"></span>Kracht A — 40 min (dinsdag)</div>
+      <div class="info-block">
+        <strong>Opwarming:</strong> 5 min bewegen eerst — springtouw of jogging ter plaatse, dan World's Greatest Stretch 3×/kant. Nooit koud belasten.
+      </div>
+      <div class="card">
+        <div class="card-header" onclick="toggleCard('krachtA')">
+          <div class="card-title">Kracht A — heup & posterior chain</div>
+          <div class="card-meta">5 oefeningen<br>~35 min</div>
+        </div>
+        <div class="card-body" id="body-krachtA">
+
+          <div class="exercise"><div class="ex-row"><div class="ex-num">01</div><div class="ex-content">
+            <div class="ex-name">Kettlebell Swing</div>
+            <div class="ex-desc">Heupgedreven — geen squat. 2×12 kg opbouwen naar 2×24 kg. Explosief omhoog, gecontroleerd terug.</div>
+            <div class="ex-volume green">4 × 15 — 60 sec rust</div>
+            <a class="yt-link" href="https://www.youtube.com/watch?v=sSESeQAir2M" target="_blank"><span class="yt-icon"></span>Demonstratie</a>
+          </div></div></div>
+
+          <div class="exercise"><div class="ex-row"><div class="ex-num">02</div><div class="ex-content">
+            <div class="ex-name">Goblet Squat</div>
+            <div class="ex-desc">Kettlebell voor de borst. Diep zakken, knieën over voeten. Borst omhoog, rug recht.</div>
+            <div class="ex-volume green">3 × 10 — 60 sec rust</div>
+            <a class="yt-link" href="https://www.youtube.com/watch?v=MeIiIdhvXT4" target="_blank"><span class="yt-icon"></span>Demonstratie</a>
+          </div></div></div>
+
+          <div class="exercise"><div class="ex-row"><div class="ex-num">03</div><div class="ex-content">
+            <div class="ex-name">Single-Leg Romanian Deadlift</div>
+            <div class="ex-desc">Één been, heup achteruit, rug recht. Start zonder gewicht, daarna kettlebell. Trailrun-specifiek voor stabiliteit.</div>
+            <div class="ex-volume green">3 × 8 per kant — 60 sec rust</div>
+            <a class="yt-link" href="https://www.youtube.com/watch?v=D0zTJEBzfgQ" target="_blank"><span class="yt-icon"></span>Demonstratie</a>
+          </div></div></div>
+
+          <div class="exercise"><div class="ex-row"><div class="ex-num">04</div><div class="ex-content">
+            <div class="ex-name">Push-Up</div>
+            <div class="ex-desc">Lichaam als plank. Ellebogen 45° van lichaam. Borst raakt bijna de grond. Progressie: voeten omhoog.</div>
+            <div class="ex-volume green">3 × max (stop 2 voor falen)</div>
+          </div></div></div>
+
+          <div class="exercise"><div class="ex-row"><div class="ex-num">05</div><div class="ex-content">
+            <div class="ex-name">Farmer's Carry</div>
+            <div class="ex-desc">2×24 kg kettlebell, rechtop lopen over ~20 m. Schouders laag, core aan. Grip + stabiliteit in één.</div>
+            <div class="ex-volume green">3 × 20 m</div>
+          </div></div></div>
+
+          <button class="start-btn green" onclick="startSession('krachtA')">▶ Start begeleide sessie</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kracht B -->
+    <div class="routine-group">
+      <div class="routine-label"><span class="dot-label green"></span>Kracht B — 40 min (zaterdag)</div>
+      <div class="card">
+        <div class="card-header" onclick="toggleCard('krachtB')">
+          <div class="card-title">Kracht B — duw, trek & core</div>
+          <div class="card-meta">5 oefeningen<br>~35 min</div>
+        </div>
+        <div class="card-body" id="body-krachtB">
+
+          <div class="exercise"><div class="ex-row"><div class="ex-num">01</div><div class="ex-content">
+            <div class="ex-name">Kettlebell Deadlift</div>
+            <div class="ex-desc">2 kettlebells of zandzak. Heup achteruit, rug recht, kern gespannen. Langzaam opbouwen in gewicht.</div>
+            <div class="ex-volume green">4 × 8 — 90 sec rust</div>
+            <a class="yt-link" href="https://www.youtube.com/watch?v=op9kVnSso6Q" target="_blank"><span class="yt-icon"></span>Demonstratie</a>
+          </div></div></div>
+
+          <div class="exercise"><div class="ex-row"><div class="ex-num">02</div><div class="ex-content">
+            <div class="ex-name">Bulgarian Split Squat</div>
+            <div class="ex-desc">Achterste voet op stoel. Voorste knie over voet zakken. Één been per keer. Heup en quad gecombineerd.</div>
+            <div class="ex-volume green">3 × 8 per kant — 60 sec rust</div>
+            <a class="yt-link" href="https://www.youtube.com/watch?v=2C-uNgKwPLE" target="_blank"><span class="yt-icon"></span>Demonstratie</a>
+          </div></div></div>
+
+          <div class="exercise"><div class="ex-row"><div class="ex-num">03</div><div class="ex-content">
+            <div class="ex-name">Weerstandsband Row</div>
+            <div class="ex-desc">Band aan deurklink. Armen trekken naar heup. Schouderbladen knijpen aan het einde. Elleboog-vriendelijk.</div>
+            <div class="ex-volume green">3 × 12 — 60 sec rust</div>
+            <a class="yt-link" href="https://www.youtube.com/watch?v=xQNrFHEMhI4" target="_blank"><span class="yt-icon"></span>Demonstratie</a>
+          </div></div></div>
+
+          <div class="exercise"><div class="ex-row"><div class="ex-num">04</div><div class="ex-content">
+            <div class="ex-name">Ab-Wheel Rollout</div>
+            <div class="ex-desc">Vanuit knieën. Langzaam uitrollen, kern gespannen, rug niet doorzakken. Stop voor falen van vorm.</div>
+            <div class="ex-volume green">3 × 8</div>
+          </div></div></div>
+
+          <div class="exercise"><div class="ex-row"><div class="ex-num">05</div><div class="ex-content">
+            <div class="ex-name">Zandzak Shouldering</div>
+            <div class="ex-desc">20 kg zandzak van grond op schouder wisselen. Rotatief, functioneel, conditioneel. Kiten-relevant.</div>
+            <div class="ex-volume green">3 × 5 per kant</div>
+          </div></div></div>
+
+          <button class="start-btn green" onclick="startSession('krachtB')">▶ Start begeleide sessie</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loopopbouw -->
+    <div class="routine-group">
+      <div class="routine-label"><span class="dot-label green"></span>Loopopbouw — trailrun 16 km</div>
+      <div class="card">
+        <div class="card-header" onclick="toggleCard('loop')">
+          <div class="card-title">Loopplan — 5 fasen</div>
+          <div class="card-meta">Najaar<br>16 km doel</div>
+        </div>
+        <div class="card-body" id="body-loop">
+
+          <div class="exercise"><div class="ex-row"><div class="ex-num">F1</div><div class="ex-content">
+            <div class="ex-name">Basisopbouw — weken 1–4</div>
+            <div class="ex-desc">3× per week lopen. Start 20 min, eindig op 35 min. Tempo: je kunt nog spreken. Vlak terrein ok.</div>
+            <div class="ex-volume green">20 → 35 min</div>
+          </div></div></div>
+
+          <div class="exercise"><div class="ex-row"><div class="ex-num">F2</div><div class="ex-content">
+            <div class="ex-name">Duuruitbreiding — weken 5–8</div>
+            <div class="ex-desc">Langste loop van de week stijgt naar 50–60 min. Begin oneven ondergrond te zoeken. Bergop wandelen telt mee.</div>
+            <div class="ex-volume green">35 → 60 min</div>
+          </div></div></div>
+
+          <div class="exercise"><div class="ex-row"><div class="ex-num">F3</div><div class="ex-content">
+            <div class="ex-name">Baby-buffer — september</div>
+            <div class="ex-desc">Tweede kindje verwacht. Schaal terug naar 2× onderhoudslopen van 25–30 min. Geen progressie verwacht, enkel continuïteit.</div>
+            <div class="ex-volume green">2 × 25–30 min</div>
+          </div></div></div>
+
+          <div class="exercise"><div class="ex-row"><div class="ex-num">F4</div><div class="ex-content">
+            <div class="ex-name">Finale opbouw — weken na september</div>
+            <div class="ex-desc">Herstel van routines. Langste loop opbouwen naar 12–14 km. Hoogtemeters zoeken. Bergaf trainen — knieën en quads.</div>
+            <div class="ex-volume green">60 → 90 min</div>
+          </div></div></div>
+
+          <div class="exercise"><div class="ex-row"><div class="ex-num">F5</div><div class="ex-content">
+            <div class="ex-name">Tapering — 2 weken voor de run</div>
+            <div class="ex-desc">Volume -30%. Intensiteit behouden. Één korte trailloop op het parcours als je kan. Goed slapen, goed eten.</div>
+            <div class="ex-volume green">Volume −30%</div>
+          </div></div></div>
+
+          <div class="exercise"><div class="ex-row"><div class="ex-num">💡</div><div class="ex-content">
+            <div class="ex-name">Trailrun-tip</div>
+            <div class="ex-desc">Wandelen bergop is geen falen — het is tactiek. Train ook bergaf: dat is waar knieën en quads worden afgebeuld. Single-leg RDL in Kracht A is hier direct voor.</div>
+          </div></div></div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Elleboog fase 2 -->
+    <div class="elbow-note">
+      <strong>Elleboog in fase 2</strong>
+      Boulderen en kettlebell rows belasten de elleboog. Bouw gradueel op. Zodra je tenniselleboog reageert: stop met de triggerende activiteit voor 48 uur, hervat het excentrisch protocol dagelijks, en schaal daarna traag terug op.
+    </div>
+
+  </div><!-- end p2-content -->
+</div><!-- end panel-p2 -->
+
+
+<!-- ═══════════ TIMER OVERLAY ═══════════ -->
+<div class="overlay" id="overlay">
+  <div class="timer-phase" id="t-phase">Ochtend</div>
+  <div class="timer-exercise" id="t-exercise">Cat-Cow</div>
+  <div class="timer-volume" id="t-volume">10 herhalingen</div>
+  <div class="timer-desc" id="t-desc"></div>
+  <a class="timer-yt" id="t-yt" href="#" target="_blank">
+    <span class="timer-yt-icon"></span>Bekijk op YouTube
+  </a>
+  <div class="timer-circle">
+    <svg viewBox="0 0 130 130">
+      <circle class="circle-bg" cx="65" cy="65" r="56"/>
+      <circle class="circle-fill" id="circle-fill" cx="65" cy="65" r="56"
+        stroke-dasharray="352" stroke-dashoffset="0"/>
+    </svg>
+    <div class="timer-number" id="t-number">—</div>
+  </div>
+  <div class="timer-controls">
+    <button class="t-btn" onclick="closeOverlay()">✕ Stop</button>
+    <button class="t-btn primary" id="next-btn" onclick="nextExercise()">Volgende →</button>
+  </div>
+  <div class="timer-progress" id="timer-progress"></div>
+</div>
+
+
+<script>
+const SESSIONS_NEEDED = 24;
+
+const sessionData = {
+  ochtend: {
+    label: 'Ochtend', phase: 1,
+    exercises: [
+      { name: 'Cat-Cow', volume: '10 herhalingen', desc: 'Adem in → rug holt. Adem uit → rug rond. Tempo = ademhaling.', rest: 0, yt: 'https://www.youtube.com/watch?v=MgDn34q4Hm8' },
+      { name: '90/90 Hip Rotation', volume: '8× per kant', desc: 'Zittend, knieën 90°. Bekken voor en achter kantelen. Houd eindpunt 2 sec.', rest: 10, yt: 'https://www.youtube.com/watch?v=f_7qIPxw6nE' },
+      { name: 'Chin Tuck', volume: '10 herhalingen', desc: 'Kin horizontaal naar achter. Geen neerwaartse rotatie. Houd 3 sec.', rest: 10, yt: 'https://www.youtube.com/watch?v=gIBoxQ6AlS0' },
+      { name: "World's Greatest Stretch", volume: '5× per kant', desc: 'Uitvalspas, hand naast voet. Elleboog naar grond, arm omhoog draaien.', rest: 15, yt: 'https://www.youtube.com/watch?v=-CiWQ2IvY34' },
+      { name: 'Thread the Needle', volume: '8× per kant', desc: 'Viervoeters. Arm door opening tot schouder en wang de grond raken.', rest: 15, yt: 'https://www.youtube.com/watch?v=oAQ_qycUj5o' },
+      { name: 'McKenzie Press-Up', volume: '10 herhalingen', desc: 'Op buik, handen onder schouders. Bovenlichaam omhoog, bekken op grond.', rest: 0, yt: 'https://www.youtube.com/watch?v=tIZppe-RB0g' },
+    ]
+  },
+  bureau: {
+    label: 'Bureaubreak', phase: 1,
+    exercises: [
+      { name: 'Chin Tuck', volume: '10 herhalingen', desc: 'Op stoel. Kin horizontaal terugtrekken. Houd 3 sec.', rest: 0, yt: 'https://www.youtube.com/watch?v=7rnlAVhAK-8' },
+      { name: 'Schouderblad knijpen', volume: '10× — 3 sec hold', desc: 'Rechtop. Schouderbladen naar elkaar en omlaag.', rest: 10, yt: null },
+      { name: 'Seated Hip Flexor Stretch', volume: '30 sec per kant', desc: 'Vooraan op stoel. Één been achterwaarts. Bekken licht vooruit.', rest: 30, yt: null },
+      { name: 'Thoracale rotatie', volume: '10× per kant', desc: 'Armen gekruist. Draai vanuit borstwervelkolom. Hoofd volgt mee.', rest: 0, yt: null },
+    ]
+  },
+  avond: {
+    label: 'Avond', phase: 1,
+    exercises: [
+      { name: 'Dead Bug', volume: '3 × 6 per kant', desc: 'Ruglig, armen omhoog, heupen 90°. Tegenovergesteld arm en been. Rug op grond.', rest: 20, yt: 'https://www.youtube.com/watch?v=zechBkcIMf0' },
+      { name: 'Glute Bridge', volume: '3 × 10', desc: 'Ruglig, knieën gebogen. Bekken omhoog. Lijn knie–heup–schouder. 2 sec hold.', rest: 20, yt: 'https://www.youtube.com/watch?v=xpc8Jz6zvak' },
+      { name: 'Bird Dog', volume: '3 × 6 per kant', desc: 'Viervoeters. Arm en been horizontaal strekken. 3 sec houden.', rest: 20, yt: 'https://www.youtube.com/watch?v=5Zp9IYxDYB4' },
+      { name: 'Wall Slide', volume: '2 × 10', desc: 'Rug tegen muur, W → Y. Ellebogen en polsen blijven de muur raken.', rest: 0, yt: 'https://www.youtube.com/watch?v=Sws_GwrlYO0' },
+    ]
+  },
+  krachtA: {
+    label: 'Kracht A', phase: 2,
+    exercises: [
+      { name: 'KB Swing', volume: '4 × 15', desc: 'Heupgedreven — geen squat. Explosief omhoog, gecontroleerd terug.', rest: 60, yt: 'https://www.youtube.com/watch?v=sSESeQAir2M' },
+      { name: 'Goblet Squat', volume: '3 × 10', desc: 'Kettlebell voor de borst. Diep zakken, knieën over voeten. Borst omhoog.', rest: 60, yt: 'https://www.youtube.com/watch?v=MeIiIdhvXT4' },
+      { name: 'Single-Leg RDL', volume: '3 × 8 per kant', desc: 'Één been, heup achteruit, rug recht. Start zonder gewicht.', rest: 60, yt: 'https://www.youtube.com/watch?v=D0zTJEBzfgQ' },
+      { name: 'Push-Up', volume: '3 × max', desc: 'Lichaam als plank. Ellebogen 45°. Stop 2 voor falen.', rest: 60, yt: null },
+      { name: "Farmer's Carry", volume: '3 × 20 m', desc: '2×24 kg kettlebell, rechtop lopen. Schouders laag, core aan.', rest: 60, yt: null },
+    ]
+  },
+  krachtB: {
+    label: 'Kracht B', phase: 2,
+    exercises: [
+      { name: 'KB Deadlift', volume: '4 × 8', desc: 'Heup achteruit, rug recht, kern gespannen. Langzaam opbouwen in gewicht.', rest: 90, yt: 'https://www.youtube.com/watch?v=op9kVnSso6Q' },
+      { name: 'Bulgarian Split Squat', volume: '3 × 8 per kant', desc: 'Achterste voet op stoel. Voorste knie over voet zakken.', rest: 60, yt: 'https://www.youtube.com/watch?v=2C-uNgKwPLE' },
+      { name: 'Weerstandsband Row', volume: '3 × 12', desc: 'Band aan deurklink. Trekken naar heup. Schouderbladen knijpen.', rest: 60, yt: 'https://www.youtube.com/watch?v=xQNrFHEMhI4' },
+      { name: 'Ab-Wheel Rollout', volume: '3 × 8', desc: 'Vanuit knieën. Langzaam uitrollen. Kern gespannen, rug niet doorzakken.', rest: 60, yt: null },
+      { name: 'Zandzak Shouldering', volume: '3 × 5 per kant', desc: '20 kg zandzak van grond op schouder wisselen.', rest: 60, yt: null },
+    ]
+  }
+};
+
+// State
+let state = JSON.parse(localStorage.getItem('beweeg-v2') || 'null') || { sessions: 0, log: [], activePhase: 1 };
+let currentSession = null;
+let currentIdx = 0;
+let timerInterval = null;
+const CIRC = 352;
+
+function save() { localStorage.setItem('beweeg-v2', JSON.stringify(state)); }
+
+const unlocked = () => state.sessions >= SESSIONS_NEEDED;
+
+function updateUI() {
+  const s = state.sessions, max = SESSIONS_NEEDED;
+  const pct = Math.min(s / max * 100, 100);
+
+  document.getElementById('session-count').textContent = `${s} / ${max}`;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('p2-locked-fill').style.width = pct + '%';
+  document.getElementById('p2-locked-label').textContent = `${s} / ${max} sessies`;
+
+  if (unlocked()) {
+    // Unlock tab
+    const t2 = document.getElementById('tab-p2');
+    t2.classList.remove('locked');
+    t2.textContent = 'Fase 2';
+
+    // Show p2 content, hide lock
+    document.getElementById('p2-locked').style.display = 'none';
+    document.getElementById('p2-content').style.display = 'block';
+
+    // Unlock notice in p1
+    document.getElementById('unlock-notice').classList.add('show');
+
+    // Progress bar to green
+    document.getElementById('progress-fill').classList.add('p2');
+    document.getElementById('phase-subtitle').textContent = 'Fase 2 — kracht & uithouding';
+    document.getElementById('progress-label-text').textContent = 'Fase 2 ontgrendeld ✓';
+  }
+
+  renderDots();
+}
+
+function renderDots() {
+  const c = document.getElementById('week-dots');
+  c.innerHTML = '';
+  for (let i = 0; i < SESSIONS_NEEDED; i++) {
+    const d = document.createElement('div');
+    const done = i < state.sessions;
+    d.className = 'dot' + (done ? ' done' : '');
+    d.textContent = done ? '✓' : (i + 1);
+    c.appendChild(d);
+  }
+}
+
+function switchPhase(p) {
+  if (p === 2 && !unlocked()) return;
+  state.activePhase = p;
+  save();
+
+  document.getElementById('panel-p1').classList.toggle('active', p === 1);
+  document.getElementById('panel-p2').classList.toggle('active', p === 2);
+  document.getElementById('tab-p1').className = 'phase-tab' + (p === 1 ? ' active-p1' : '');
+  document.getElementById('tab-p2').className = 'phase-tab' + (p === 2 ? ' active-p2' : '') + (!unlocked() ? ' locked' : '');
+}
+
+function toggleCard(id) {
+  const b = document.getElementById('body-' + id);
+  b.classList.toggle('open');
+}
+
+function startSession(type) {
+  currentSession = sessionData[type];
+  currentIdx = 0;
+  const nextBtn = document.getElementById('next-btn');
+  nextBtn.className = 't-btn primary' + (currentSession.phase === 2 ? ' green' : '');
+  document.getElementById('overlay').classList.add('active');
+  showExercise();
+}
+
+function showExercise() {
+  const ex = currentSession.exercises[currentIdx];
+  document.getElementById('t-phase').textContent = currentSession.label;
+  document.getElementById('t-exercise').textContent = ex.name;
+  document.getElementById('t-volume').textContent = ex.volume;
+  document.getElementById('t-desc').textContent = ex.desc;
+
+  const ytEl = document.getElementById('t-yt');
+  if (ex.yt) { ytEl.href = ex.yt; ytEl.style.display = 'inline-flex'; }
+  else { ytEl.style.display = 'none'; }
+
+  clearInterval(timerInterval);
+  if (ex.rest > 0) startTimer(ex.rest);
+  else {
+    document.getElementById('t-number').textContent = '—';
+    document.getElementById('circle-fill').style.strokeDashoffset = '0';
+  }
+
+  const isLast = currentIdx === currentSession.exercises.length - 1;
+  document.getElementById('next-btn').textContent = isLast ? 'Afronden ✓' : 'Volgende →';
+  renderTimerDots();
+}
+
+function startTimer(seconds) {
+  const fill = document.getElementById('circle-fill');
+  let rem = seconds;
+  document.getElementById('t-number').textContent = rem;
+  fill.style.strokeDashoffset = '0';
+  timerInterval = setInterval(() => {
+    rem--;
+    document.getElementById('t-number').textContent = rem;
+    fill.style.strokeDashoffset = CIRC * (1 - rem / seconds);
+    if (rem <= 0) clearInterval(timerInterval);
+  }, 1000);
+}
+
+function nextExercise() {
+  clearInterval(timerInterval);
+  if (currentIdx < currentSession.exercises.length - 1) {
+    currentIdx++;
+    showExercise();
+  } else {
+    // Only count fase-1 sessions toward unlock
+    if (currentSession.phase === 1) {
+      state.sessions = Math.min(state.sessions + 1, SESSIONS_NEEDED);
+    }
+    state.log.push({ date: new Date().toISOString(), type: currentSession.label });
+    save();
+    updateUI();
+    closeOverlay();
+    const msg = currentSession.phase === 1
+      ? `Sessie klaar ✓\nFase 1: ${state.sessions} / ${SESSIONS_NEEDED}`
+      : `Sessie klaar ✓\n${currentSession.label} voltooid`;
+    setTimeout(() => alert(msg), 100);
+  }
+}
+
+function closeOverlay() {
+  clearInterval(timerInterval);
+  document.getElementById('overlay').classList.remove('active');
+}
+
+function renderTimerDots() {
+  const c = document.getElementById('timer-progress');
+  c.innerHTML = '';
+  currentSession.exercises.forEach((_, i) => {
+    const d = document.createElement('div');
+    const p2 = currentSession.phase === 2;
+    d.className = 't-dot' + (i < currentIdx ? (p2 ? ' done-p2' : ' done') : i === currentIdx ? ' current' : '');
+    c.appendChild(d);
+  });
+}
+
+// Init — restore active phase
+updateUI();
+switchPhase(unlocked() ? state.activePhase : 1);
+
+// Splash screen
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    document.getElementById('splash').classList.add('hidden');
+  }, 800);
+});
+</script>
+</body>
+</html>
